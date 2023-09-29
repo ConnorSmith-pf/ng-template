@@ -1,0 +1,40 @@
+name: 'PR Checks'
+
+trigger: none
+
+variables:
+  - template: ../vars/variables.yml
+  - name: TARGET_BRANCH
+    value: $[replace(variables['System.PullRequest.TargetBranch'],'refs/heads/','origin/')]
+  - name: BASE_SHA
+    value: $(git merge-base $(TARGET_BRANCH) HEAD) # Latest commit of target branch, i.e. the branch merging into.
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: DevOps/DevOps-Pipelines
+
+steps:
+  - checkout: self
+    displayName: 'Git: Checkout'
+    fetchDepth: '0'
+
+  - template: ../shared/node.yml
+    parameters:
+      nodeVersion: $(NODE_VERSION)
+
+  - bash: npm run lint
+    displayName: 'Lint'
+
+  - bash: npm run stylelint
+    displayName: 'Stylelint'
+
+  - bash: npm run test -- --ci --changedSince=$(BASE_SHA) --passWithNoTests
+    displayName: 'Test Affected'
+
+  - bash: npm run build:prod
+    displayName: 'Build Check'
